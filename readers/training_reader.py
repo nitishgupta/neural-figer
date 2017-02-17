@@ -38,32 +38,27 @@ class Mention(object):
 
 class TrainingDataReader(object):
   def __init__(self, train_mentions_dir, val_mentions_dir, word_vocab_pkl,
-               label_vocab_pkl, word2vec_bin_gz, batch_size, word_threshold=None):
+               label_vocab_pkl, word2vec_bin_gz,
+               batch_size, word_threshold=None):
     self.unk_word = '<unk_word>' # In tune with word2vec
     self.unk_wid = "<unk_wid>"
     self.tr_sup = 'tr_sup'
     self.tr_unsup = 'tr_unsup'
     #self.sanity_checks(train_file, word2vec_bin_gz, batch_size)
+    if (not os.path.exists(word_vocab_pkl) or
+        not os.path.exists(label_vocab_pkl)):
+      print("Atleast one vocab not found. Run vocabs.py before running model.")
+      sys.exit()
 
-    # WID VOCAB
-    if not os.path.exists(word_vocab_pkl):
-      assert word_threshold != None, "Word Threshold for Vocab making needed!"
-      print("[#] Creating word vocab from training data. Threshold: {}".format(word_threshold))
-      self.make_word_vocab(train_file, word_vocab_pkl, word_threshold)
     print("[#] Loading word vocab ... ")
     (self.word2idx, self.idx2word) = load(word_vocab_pkl)
     self.num_words = len(self.idx2word)
     print(" [#] Word vocab loaded. Size of vocab : {}".format(self.num_words))
 
-    # Label Vocab
-    if not os.path.exists(label_vocab_pkl):
-      print("[#] Creating label vocab from training data ... ")
-      self.make_label_vocab(train_file, label_vocab_pkl)
     print("[#] Loading label vocab ... ")
     (self.label2idx, self.idx2label) = load(label_vocab_pkl)
     self.num_labels = len(self.idx2label)
     print(" [#] Label vocab loaded. Number of labels : {}".format(self.num_labels))
-
 
     print("[#] Training Mentions Dir : {}".format(train_mentions_dir))
     self.tr_mens_dir = train_mentions_dir
@@ -94,16 +89,6 @@ class TrainingDataReader(object):
                                    use_shelve=False)
     self.w2v_dim = self.word2vec_model.dim
     self.unk_vector = self.word2vec_model.get_vector('unk')
-    '''
-    '''
-    # Crosswikis dictionary
-    stime = time.time()
-    print("[#] Loading normalized crosswikis dictionary ... ")
-    self.crosswikis_dict = load(crosswikis_norm_pkl)
-    ttime = (time.time() - stime)/60.0
-    print(" [#] Crosswikis dictionary loaded!. Time Take : %2.4f mins" % ttime)
-    self.cwikis_candidate_thresh = cwikis_candidate_thresh
-    print("[#] Crosswikis Candidate Threshold: %d" % self.cwikis_candidate_thresh)
     '''
 
     self.batch_size = batch_size
@@ -214,21 +199,6 @@ class TrainingDataReader(object):
     sys.exit(0)
   #enddef
 
-  def _getLnrm(self, arg):
-    """Normalizes the given arg by stripping it of diacritics, lowercasing, and
-    removing all non-alphanumeric characters.
-    """
-    arg = ''.join([
-      c for c in unicodedata.normalize('NFD', arg)
-      if unicodedata.category(c) != 'Mn'
-    ])
-    arg = arg.lower()
-    arg = ''.join([
-      c for c in arg
-      if c in set('abcdefghijklmnopqrstuvwxyz0123456789')
-    ])
-    return arg
-
   def _next_batch(self, data_type):
     ''' Data : wikititle \t mid \t wid \t start \t end \t tokens \t labels
     start and end are inclusive
@@ -305,65 +275,6 @@ class TrainingDataReader(object):
       idx2element.append(element)
       element2idx[element] = len(idx2element) - 1
 
-  def make_word_vocab(self, train_file, word_vocab_pkl, threshold):
-    #enddef
-    print(" [#] Loading training mentions ... ")
-    with open(train_file, 'r') as f:
-      mentions = f.read().strip().split("\n")
-    num_mens = len(mentions)
-    print(" [#] Training mentions loaded. Num of mentions: {}".format(num_mens))
-    print(" [#] Starting to make word vocab ...")
-
-    word_count_dict = {}
-    # Making word-count dictionary
-    for mention in mentions:
-      ssplit = mention.split("\t")
-      tokens = ssplit[5].split(" ")
-      for token in tokens:
-        if token not in word_count_dict:
-          word_count_dict[token] = 0
-        word_count_dict[token] = word_count_dict[token] + 1
-      #endfor
-    #end-processed all mentions
-    print(" [#] Read all tokens. Number of unique tokens: {}".format(len(word_count_dict)))
-
-    # WORD VOCAB
-    idx2word = [self.unk_word]
-    word2idx = {self.unk_word:0}
-    for word, count in word_count_dict.items():
-      if count > threshold:
-        self.add_to_vocab(element2idx=word2idx, idx2element=idx2word,
-                          element=word)
-    #endfor
-    print(" [#] Threhsolded word vocab. Word Vocab Size: {}".format(len(idx2word)))
-    save(word_vocab_pkl, (word2idx, idx2word))
-  #enddef
-
-  def make_label_vocab(self, train_file, label_vocab_pkl):
-    #enddef
-    print("[#] Loading training mentions ... ")
-    with open(train_file, 'r') as f:
-      mentions = f.read().strip().split("\n")
-    num_mens = len(mentions)
-    print("[#] Training mentions loaded. Num of mentions: {}".format(num_mens))
-    print("[#] Starting to make label set ...")
-
-    idx2label = []
-    label2idx = {}
-
-    # Making word-count dictionary
-    for mention in mentions:
-      ssplit = mention.split("\t")
-      labels = ssplit[6].split(" ")
-      for label in labels:
-        self.add_to_vocab(element2idx=label2idx, idx2element=idx2label,
-                          element=label)
-      #endfor
-    #end-processed all mentions
-    print(" [#] Label set made. Label Set Size: {}".format(len(idx2label)))
-    save(label_vocab_pkl, (label2idx, idx2label))
-  #enddef
-
 if __name__ == '__main__':
   batch_size = 1000
   num_batch = 1000
@@ -374,7 +285,7 @@ if __name__ == '__main__':
     label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl",
     word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
     batch_size=batch_size,
-    word_threshold=1)
+    word_threshold=5)
 
   stime = time.time()
 

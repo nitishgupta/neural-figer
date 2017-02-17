@@ -34,4 +34,3 @@ class LabelingModel(Model):
 
       self.labeling_loss = tf.reduce_sum(
         self.cross_entropy_losses) / tf.to_float(self.batch_size)*tf.to_float(self.num_labels)
-

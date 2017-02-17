@@ -30,23 +30,7 @@ class Model(object):
       os.makedirs(log_dir)
     return log_dir
 
-  def save(self, checkpoint_dir, var_list=None, attrs=None, global_step=None):
-    if var_list == None:
-      var_list = tf.all_variables()
-    saver = tf.train.Saver(var_list=var_list, max_to_keep=5)
-
-    print(" [*] Saving checkpoints...")
-    model_name = type(self).__name__
-    model_dir = self.get_model_dir(attrs=attrs)
-
-    checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
-    if not os.path.exists(checkpoint_dir):
-      os.makedirs(checkpoint_dir)
-    saver.save(self.sess, os.path.join(checkpoint_dir, model_name),
-               global_step=global_step)
-    print(" [*] Saving done...")
-
-  def save_wsaver(self, saver, checkpoint_dir, attrs=None, global_step=None):
+  def save(self, saver, checkpoint_dir, attrs=None, global_step=None):
     print(" [*] Saving checkpoints...")
     model_name = type(self).__name__
     model_dir = self.get_model_dir(attrs=attrs)
@@ -67,36 +51,13 @@ class Model(object):
 
     start_iter = self.step.eval()
 
-  def load(self, checkpoint_dir, var_list=None, attrs=None):
-    if var_list == None:
-      var_list = tf.all_variables()
-    saver = tf.train.Saver(var_list=var_list, max_to_keep=5)
-
+  def load(self, saver, checkpoint_dir, attrs=None):
     print(" [*] Loading checkpoints...")
     model_dir = self.get_model_dir(attrs=attrs)
     # /checkpointdir/attrs=values/
     checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
-
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-    if ckpt and ckpt.model_checkpoint_path:
-      print("ckpt.model_checkpoint_path: {}".format(ckpt.model_checkpoint_path))
-      ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-      #ckpt_name = "ElLogisticModel-15000"
-      print("ckpt_name: {}".format(ckpt_name))
-      saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-      print(" [*] Load SUCCESS")
-      return True
-    else:
-      print(" [!] Load failed...")
-      return False
-
-  def load_wsaver(self, saver, checkpoint_dir, attrs=None):
-    print(" [*] Loading checkpoints...")
-    model_dir = self.get_model_dir(attrs=attrs)
-    # /checkpointdir/attrs=values/
-    checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
-
-    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    print(" [#] Checkpoint Dir : {}".format(checkpoint_dir))
     if ckpt and ckpt.model_checkpoint_path:
       print("ckpt.model_checkpoint_path: {}".format(ckpt.model_checkpoint_path))
       ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
@@ -133,22 +94,3 @@ class Model(object):
       if scope_name in scope_var_name:
         scope_var_list.append(var)
     return scope_var_list
-
-
-  # def load(self, checkpoint_dir, list_of_variables):
-  #   self.saver = tf.train.Saver(var_list=list_of_variables,
-  #                               max_to_keep=5)
-
-  #   print(" [*] Loading checkpoints...")
-  #   model_dir = self.get_model_dir()
-  #   checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
-
-  #   ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-  #   if ckpt and ckpt.model_checkpoint_path:
-  #     ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-  #     self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
-  #     print(" [*] Load SUCCESS")
-  #     return True
-  #   else:
-  #     print(" [!] Load failed...")
-  #     return False

@@ -86,6 +86,7 @@ class ContextEncoderModel(Model):
 
       # [B, context_encoded_dim]
       self.context_encoded = tf.matmul(self.context_lstm_encoded, self.trans_weights)
+      #self.context_encoded = tf.tanh(self.context_encoded)
       self.context_encoded = tf.nn.dropout(self.context_encoded, keep_prob=self.dropout_keep_prob)
   ###########   end def __init__      ##########################################
 

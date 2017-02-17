@@ -180,9 +180,9 @@ class FigerModel(Model):
     # (Try) Load all pretraining model variables
     # If pre-training graph not found - Initialize trainable + optim variables
     print("Loading pre-saved checkpoint...")
-    load_status = self.load_wsaver(saver=saver,
-                                   checkpoint_dir=self.checkpoint_dir,
-                                   attrs=self._attrs)
+    load_status = self.load(saver=saver,
+                            checkpoint_dir=self.checkpoint_dir,
+                            attrs=self._attrs)
     if not load_status:
       self.sess.run(tf.initialize_variables(vars_tostore))
 
@@ -278,9 +278,9 @@ class FigerModel(Model):
        writer.add_summary(summary_str, iteration)
 
       if iteration != 0 and iteration % 2000 == 0:
-        self.save_wsaver(saver=saver, checkpoint_dir=self.checkpoint_dir,
-                         attrs=self._attrs,
-                         global_step=self.global_step)
+        self.save(saver=saver, checkpoint_dir=self.checkpoint_dir,
+                  attrs=self._attrs,
+                  global_step=self.global_step)
         self.validation()
   #end pretraining
 
@@ -502,6 +502,3 @@ class FigerModel(Model):
     print("Variables in list: ")
     for var in list_vars:
       print("  %s" % var.name)
-
-
-

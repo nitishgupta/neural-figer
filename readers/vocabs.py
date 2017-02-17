@@ -54,28 +54,27 @@ class Mention(object):
 
 class VocabBuilder(object):
 	def __init__(self, train_mentions_dir, val_mentions_dir, word_vocab_pkl,
-							 label_vocab_pkl, knwn_wid_vocab_pkl, unkwn_wid_vocab_pkl,
-							 wid2Wikititle_pkl, word_threshold=5):
+							 label_vocab_pkl, word_threshold=5):
 		self.unk_word = '<unk_word>' # In tune with word2vec
 		self.unk_wid = '<unk_wid>'
 
 		self.tr_mens_files = get_mention_files(train_mentions_dir)
 		self.val_mens_files = get_mention_files(val_mentions_dir)
 
-		tr_data_vocabs_exist = self.check_train_data_vocabs_exist(word_vocab_pkl,
-			label_vocab_pkl, knwn_wid_vocab_pkl)
+		tr_data_vocabs_exist = self.check_train_data_vocabs_exist(
+			word_vocab_pkl, label_vocab_pkl)
 
 		if not tr_data_vocabs_exist:
 			print("All/Some Training Vocabs do not exist. Making ... ")
 			self.make_training_data_vocabs(train_mentions_dir, self.tr_mens_files,
 																		 word_vocab_pkl, label_vocab_pkl,
-																		 knwn_wid_vocab_pkl, word_threshold)
+																		 word_threshold)
+		else:
+			print("All Vocabs Exist. Exiting.")
 		#end-vocab-init
 
-	def check_train_data_vocabs_exist(self, word_vocab_pkl, label_vocab_pkl,
-																		knwn_wid_vocab_pkl):
-		if (os.path.exists(word_vocab_pkl) and os.path.exists(label_vocab_pkl) and
-				os.path.exists(knwn_wid_vocab_pkl)):
+	def check_train_data_vocabs_exist(self, word_vocab_pkl, label_vocab_pkl):
+		if (os.path.exists(word_vocab_pkl) and os.path.exists(label_vocab_pkl)):
 			return True
 		else:
 			return False
@@ -95,8 +94,6 @@ class VocabBuilder(object):
 		word2idx = {self.unk_word:0}
 		idx2label = []
 		label2idx = {}
-		idx2knwid = [self.unk_wid]
-		knwid2idx = {self.unk_wid:0}
 
 		files_done = 0
 		for file in tr_mens_files:
@@ -112,8 +109,6 @@ class VocabBuilder(object):
 						word_count_dict[token] = 0
 					word_count_dict[token] = word_count_dict[token] + 1
 
-				self.add_to_vocab(element2idx=knwid2idx, idx2element=idx2knwid,
-													element=mention.wid)
 			files_done += 1
 		#all-files-processed
 		# WORD VOCAB
@@ -126,9 +121,6 @@ class VocabBuilder(object):
 		save(word_vocab_pkl, (word2idx, idx2word))
 		print(" [#] Label Vocab Size: {}".format(len(idx2label)))
 		save(label_vocab_pkl, (label2idx, idx2label))
-		print(" [#] Known Wiki Titles Size: {}".format(len(idx2knwid)))
-		save(knwn_wid_vocab_pkl, (knwid2idx, idx2knwid))
-
 
 
 if __name__ == '__main__':
@@ -139,7 +131,4 @@ if __name__ == '__main__':
 		val_mentions_dir="/save/ngupta19/wikipedia/wiki_mentions/val",
 		word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/word_vocab.pkl",
 		label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl",
-		knwn_wid_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/knwn_wid_vocab.pkl",
-		unkwn_wid_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/unkwn_wid_vocab.pkl",
-		wid2Wikititle_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/wid2Wikititle.pkl",
 		word_threshold=5)
