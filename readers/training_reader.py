@@ -18,6 +18,9 @@ def load(fname):
   with open(fname, 'rb') as f:
     return pickle.load(f)
 
+start_word = "<s>"
+end_word = "<eos>"
+
 class Mention(object):
   def __init__(self, mention_line):
     ''' mention_line : Is the string line stored for each mention
@@ -26,10 +29,12 @@ class Mention(object):
     mention_line = mention_line.strip()
     split = mention_line.split("\t")
     (self.mid, self.wid, self.wikititle) = split[0:3]
-    self.start_token = int(split[3])
-    self.end_token = int(split[4])
+    self.start_token = int(split[3]) + 1
+    self.end_token = int(split[4]) + 1
     self.surface = split[5]
-    self.sent_tokens = split[6].split(" ")
+    self.sent_tokens = [start_word]
+    self.sent_tokens.extend(split[6].split(" "))
+    self.sent_tokens.append(end_word)
     self.types = split[7].split(" ")
     #self.end_token = min(self.end_token, len(self.sent_tokens) - 1)
     assert self.end_token <= (len(self.sent_tokens) - 1), "Line : %s" % mention_line
@@ -40,6 +45,8 @@ class TrainingDataReader(object):
   def __init__(self, train_mentions_dir, val_mentions_dir, word_vocab_pkl,
                label_vocab_pkl, word2vec_bin_gz,
                batch_size, word_threshold=None):
+    self.start_word = start_word
+    self.end_word = end_word
     self.unk_word = '<unk_word>' # In tune with word2vec
     self.unk_wid = "<unk_wid>"
     self.tr_sup = 'tr_sup'
@@ -62,7 +69,8 @@ class TrainingDataReader(object):
 
     print("[#] Training Mentions Dir : {}".format(train_mentions_dir))
     self.tr_mens_dir = train_mentions_dir
-    self.tr_mens_files = self.get_mention_files(self.tr_mens_dir)
+    #self.tr_mens_files = self.get_mention_files(self.tr_mens_dir)
+    self.tr_mens_files = ["train.mens.5"]
     self.num_tr_mens_files = len(self.tr_mens_files)
     print(" [#] Training Mention Files : {} files".format(self.num_tr_mens_files))
 
@@ -147,9 +155,9 @@ class TrainingDataReader(object):
       self.num_tr_mens = len(self.tr_mens)
       self.tr_men_idx = 0
       ttime = (time.time() - stime)/60.0
+      print("File Number loaded : {}".format(self.tr_fnum))
       print("Loaded tr mentions. Num of mentions : {}. Time : {:.2f} mins".format(
         self.num_tr_mens, ttime))
-      print("File Number loaded : {}".format(self.tr_fnum))
 
     if data_idx==1 or data_idx=="val":
       stime = time.time()
@@ -224,12 +232,12 @@ class TrainingDataReader(object):
       #labels
 
       # Left and Right context includes mention surface
-      left_tokens = m.sent_tokens[0:m.end_token+1]
-      right_tokens = m.sent_tokens[m.start_token:][::-1]
+      #left_tokens = m.sent_tokens[0:m.end_token+1]
+      #right_tokens = m.sent_tokens[m.start_token:][::-1]
 
       # Strict left and right context
-      #left_tokens = tokens[0:start]
-      #right_tokens = tokens[end+1:][::-1]
+      left_tokens = m.sent_tokens[0:m.start_token]
+      right_tokens = m.sent_tokens[m.end_token+1:][::-1]
 
       left_idxs = [self.convert_word2idx(word) for word in left_tokens]
       right_idxs = [self.convert_word2idx(word) for word in right_tokens]

@@ -36,6 +36,9 @@ def get_mention_files(mentions_dir):
 	return mention_files
 #enddef
 
+start_word = "<s>"
+end_word = "<eos>"
+
 class Mention(object):
 	def __init__(self, mention_line):
 		''' mention_line : Is the string line stored for each mention
@@ -44,18 +47,22 @@ class Mention(object):
 		mention_line = mention_line.strip()
 		split = mention_line.split("\t")
 		(self.mid, self.wid, self.wikititle) = split[0:3]
-		self.start_token = int(split[3])
-		self.end_token = int(split[4])
+		self.start_token = int(split[3]) + 1
+		self.end_token = int(split[4]) + 1
 		self.surface = split[5]
-		self.sent_tokens = split[6].split(" ")
+		self.sent_tokens = [start_word]
+		self.sent_tokens.extend(split[6].split(" "))
+		self.sent_tokens.append(end_word)
 		self.types = split[7].split(" ")
 		#self.end_token = min(self.end_token, len(self.sent_tokens) - 1)
-		assert self.end_token <= (len(self.sent_tokens) - 1), "Line : %s" % mention_line
+		assert self.end_token <= (len(self.sent_tokens) - 1), "Line : {}, end: {}, len: {}".format(mention_line, self.end_token, len(self.sent_tokens))
 
 class VocabBuilder(object):
 	def __init__(self, train_mentions_dir, val_mentions_dir, word_vocab_pkl,
 							 label_vocab_pkl, word_threshold=5):
 		self.unk_word = '<unk_word>' # In tune with word2vec
+		self.start_word = start_word
+		self.end_word = end_word
 		self.unk_wid = '<unk_wid>'
 
 		self.tr_mens_files = get_mention_files(train_mentions_dir)
@@ -86,12 +93,12 @@ class VocabBuilder(object):
 
 	def make_training_data_vocabs(self, tr_mens_dir, tr_mens_files,
 																word_vocab_pkl, label_vocab_pkl,
-																knwn_wid_vocab_pkl, threshold):
+																threshold):
 
 		print("Building training vocabs : ")
 		word_count_dict = {}
-		idx2word = [self.unk_word]
-		word2idx = {self.unk_word:0}
+		idx2word = [self.unk_word, self.start_word, self.end_word]
+		word2idx = {self.unk_word:0, self.start_word:1, self.end_word:2}
 		idx2label = []
 		label2idx = {}
 
@@ -129,6 +136,6 @@ if __name__ == '__main__':
 	b = VocabBuilder(
 		train_mentions_dir="/save/ngupta19/wikipedia/wiki_mentions/train",
 		val_mentions_dir="/save/ngupta19/wikipedia/wiki_mentions/val",
-		word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/word_vocab.pkl",
-		label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl",
+		word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/word_vocab.pkl",
+		label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/label_vocab.pkl",
 		word_threshold=5)
