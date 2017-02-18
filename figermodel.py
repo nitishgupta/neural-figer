@@ -13,7 +13,7 @@ flags = tf.app.flags
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate of adam optimizer [0.001]")
 flags.DEFINE_float("decay_rate", 0.96, "Decay rate of learning rate [0.96]")
 flags.DEFINE_float("decay_step", 10000, "# of decay step for learning rate decaying [10000]")
-flags.DEFINE_integer("max_steps", 60000, "Maximum of iteration [450000]")
+flags.DEFINE_integer("max_steps", 10000, "Maximum of iteration [450000]")
 flags.DEFINE_integer("pretraining_steps", 60000, "Number of steps to run pretraining")
 flags.DEFINE_string("model", "figer", "The name of model [nvdm, nasm]")
 flags.DEFINE_string("dataset", "figer", "The name of dataset [ptb]")
@@ -88,8 +88,8 @@ def main(_):
 
   train_dir = "/save/ngupta19/wikipedia/wiki_mentions/train"
   val_dir = "/save/ngupta19/wikipedia/wiki_mentions/val"
-  word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/word_vocab.pkl"
-  label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl"
+  word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/word_vocab.pkl"
+  label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/label_vocab.pkl"
   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz"
 
   optimizer_checks(FLAGS)

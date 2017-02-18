@@ -52,16 +52,14 @@ class Model(object):
     start_iter = self.step.eval()
 
   def load(self, saver, checkpoint_dir, attrs=None):
-    print(" [*] Loading checkpoints...")
+    print("[*] Loading checkpoints...")
     model_dir = self.get_model_dir(attrs=attrs)
     # /checkpointdir/attrs=values/
     checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-    print(" [#] Checkpoint Dir : {}".format(checkpoint_dir))
+    print("[#] Checkpoint Dir : {}".format(checkpoint_dir))
     if ckpt and ckpt.model_checkpoint_path:
-      print("ckpt.model_checkpoint_path: {}".format(ckpt.model_checkpoint_path))
       ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-      #ckpt_name = "ElLogisticModel-15000"
       print("ckpt_name: {}".format(ckpt_name))
       saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
       print(" [*] Load SUCCESS")

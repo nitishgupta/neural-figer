@@ -10,6 +10,7 @@ from models.base import Model
 from models.figer_model.context_encoder import ContextEncoderModel
 from models.figer_model.labeling_model import LabelingModel
 from models.figer_model.loss_optim import LossOptim
+from models.figer_model.norms import Norms
 
 
 np.set_printoptions(precision=5)
@@ -34,6 +35,7 @@ class FigerModel(Model):
     self.batch_size = reader.batch_size
     self.reg_constant = reg_constant
     self.dropout_keep_prob = dropout_keep_prob
+    self.lr = learning_rate
 
     # Num of clusters = Number of entities in dataset.
     self.num_labels = self.reader.num_labels
@@ -59,7 +61,7 @@ class FigerModel(Model):
     self._attrs=[
       "word_embed_dim", "num_words", "num_labels",
       "context_encoded_dim", "context_encoder_lstmsize",
-      "context_encoder_num_layers", "reg_constant", "optimizer"]
+      "context_encoder_num_layers", "reg_constant", "lr", "optimizer"]
 
     #GPU Allocations
     self.device_placements = {
@@ -68,7 +70,7 @@ class FigerModel(Model):
     }
 
     with tf.variable_scope("figer_model") as scope:
-      self.learning_rate = tf.Variable(learning_rate, name='learning_rate',
+      self.learning_rate = tf.Variable(self.lr, name='learning_rate',
                                        trainable=False)
       self.global_step = tf.Variable(0, name='global_step', trainable=False,
                                      dtype=tf.int32)
@@ -195,6 +197,7 @@ class FigerModel(Model):
     print("[#] Pre-Training iterations done: %d" % start_iter)
 
     data_loading = 0
+    self.norms = Norms(self)
 
     tf.get_default_graph().finalize()
 
@@ -213,7 +216,8 @@ class FigerModel(Model):
                    self.labels_batch: labels_batch}
 
       fetch_tensors = [self.loss_optim.labeling_loss,
-                       self.labeling_model.label_probs]
+                       self.labeling_model.label_probs,
+                       self.norms.norms]
       '''
       norm_tensors = [self.norms.text_norm,
                       self.norms.doc_norm,
@@ -238,23 +242,10 @@ class FigerModel(Model):
       fetches_new = self.sess.run(fetch_tensors,
                                   feed_dict=feed_dict)
 
-      [old_loss, old_label_sigms] = fetches_old
-      [new_loss, new_label_sigms] = fetches_new
-      '''
-      [text_norm,
-       doc_norm,
-       links_norm,
-       context_norm,
-       true_embed_norm,
-       neg_embed_norm,
-       en_ff_varnorms,
-       en_ff_gradnorms] = fetches[5]
-      en_ff_varnames = self.norms.en_ff_varnames
-      if self.decoder_bool:
-        decoder_pretraining_loss = fetches[6]
-      '''
-
-      #self.global_step.assign(iteration).eval()
+      [old_loss, old_label_sigms, old_norms] = fetches_old
+      [new_loss, new_label_sigms, new_norms] = fetches_new
+      [l_lstm_norm, r_lstm_norm,
+       c_enc_norm, lab_scores_norm] = old_norms
 
       if iteration % 100 == 0:
         # [B, L]
@@ -266,6 +257,9 @@ class FigerModel(Model):
         print("Iter %2d, Epoch %d, T %4.2f secs, Loss %.3f, New_Loss %.3f"
               % (iteration, self.reader.tr_epochs, time.time() - start_time,
                  old_loss, new_loss))
+        print("L_LSTM_NORM {0:.8f} R_LSTM_NORM {1:.8f} "
+              "CON_NORM {2:.8f} LABSCORE_NORM {3:.8f}".format(
+              l_lstm_norm, r_lstm_norm, c_enc_norm, lab_scores_norm))
         print("[OLD] Num of strict correct predictions : {}, {}".format(
           old_corr_preds, old_precision))
         # print("[NEW] Num of strict correct predictions : {}, {}".format(
@@ -282,6 +276,9 @@ class FigerModel(Model):
                   attrs=self._attrs,
                   global_step=self.global_step)
         self.validation()
+      if self.reader.tr_epochs >= 8:
+        break
+
   #end pretraining
 
   def validation(self):
