@@ -36,22 +36,22 @@ class Mention(object):
     self.sent_tokens.extend(split[6].split(" "))
     self.sent_tokens.append(end_word)
     self.types = split[7].split(" ")
-    #self.end_token = min(self.end_token, len(self.sent_tokens) - 1)
     assert self.end_token <= (len(self.sent_tokens) - 1), "Line : %s" % mention_line
   #enddef
 #endclass
 
 class TrainingDataReader(object):
-  def __init__(self, train_mentions_dir, val_mentions_dir, word_vocab_pkl,
-               label_vocab_pkl, word2vec_bin_gz,
-               batch_size, word_threshold=None):
+  def __init__(self, train_mentions_dir, val_mentions_file,
+               val_cold_mentions_file, word_vocab_pkl,
+               label_vocab_pkl, word2vec_bin_gz, batch_size,
+               strict_context=True):
     self.start_word = start_word
     self.end_word = end_word
     self.unk_word = '<unk_word>' # In tune with word2vec
     self.unk_wid = "<unk_wid>"
     self.tr_sup = 'tr_sup'
     self.tr_unsup = 'tr_unsup'
-    #self.sanity_checks(train_file, word2vec_bin_gz, batch_size)
+
     if (not os.path.exists(word_vocab_pkl) or
         not os.path.exists(label_vocab_pkl)):
       print("Atleast one vocab not found. Run vocabs.py before running model.")
@@ -60,36 +60,40 @@ class TrainingDataReader(object):
     print("[#] Loading word vocab ... ")
     (self.word2idx, self.idx2word) = load(word_vocab_pkl)
     self.num_words = len(self.idx2word)
-    print(" [#] Word vocab loaded. Size of vocab : {}".format(self.num_words))
+    print("[#] Word vocab loaded. Size of vocab : {}".format(self.num_words))
 
     print("[#] Loading label vocab ... ")
     (self.label2idx, self.idx2label) = load(label_vocab_pkl)
     self.num_labels = len(self.idx2label)
-    print(" [#] Label vocab loaded. Number of labels : {}".format(self.num_labels))
+    print("[#] Label vocab loaded. Number of labels : {}".format(self.num_labels))
 
     print("[#] Training Mentions Dir : {}".format(train_mentions_dir))
     self.tr_mens_dir = train_mentions_dir
-    #self.tr_mens_files = self.get_mention_files(self.tr_mens_dir)
-    self.tr_mens_files = ["train.mens.5"]
+    self.tr_mens_files = self.get_mention_files(self.tr_mens_dir)
+    #self.tr_mens_files = ["train.mens.5"]
     self.num_tr_mens_files = len(self.tr_mens_files)
-    print(" [#] Training Mention Files : {} files".format(self.num_tr_mens_files))
+    print("[#] Training Mention Files : {} files".format(self.num_tr_mens_files))
 
-    print("[#] Validation Mentions Dir : {}".format(val_mentions_dir))
-    self.val_mens_dir = val_mentions_dir
-    self.val_mens_files = self.get_mention_files(self.val_mens_dir)
-    self.num_val_mens_files = len(self.val_mens_files)
-    print(" [#] Validation Mention Files : {} files".format(self.num_val_mens_files))
+    print("[#] Validation Mentions File : {}".format(val_mentions_file))
+    print("[#] Cold Validation Mentions File : {}".format(val_cold_mentions_file))
 
     self.tr_mentions = []
     self.tr_men_idx = 0
     self.num_tr_mens = 0
     self.tr_fnum = 0
     self.tr_epochs = 0
-    self.val_mentions = []
+
+    print("[#] Pre-loading validation mentions ... ")
+    self.val_mentions = self._make_mentions_from_file(val_mentions_file)
+    self.cold_val_mentions = self._make_mentions_from_file(val_cold_mentions_file)
     self.val_men_idx = 0
-    self.num_val_mens = 0
-    self.val_fnum = 0
+    self.cold_val_men_idx = 0
+    self.num_val_mens = len(self.val_mentions)
+    self.num_cold_val_mens = len(self.cold_val_mentions)
     self.val_epochs = 0
+    self.cold_val_epochs = 0
+    print( "[#] Validation Mentions : {}, Cold Validation Mentions : {}".format(
+          self.num_val_mens, self.num_cold_val_mens))
 
     '''
     # Word2Vec Gensim Model
@@ -101,18 +105,16 @@ class TrainingDataReader(object):
 
     self.batch_size = batch_size
     print("[#] Batch Size: %d" % self.batch_size)
+    self.strict_context = strict_context
+    print("[#] Strict Context: {}".format(self.strict_context))
+
+
 
     print("\n[#] LOADING COMPLETE:")
     print("[1] Train mention file \n[2] Validation mentions \n"
           "[3] Word Vocab \n[4] Label Set")
 
   #*******************      END __init__      *********************************
-
-  def sanity_checks(self, train_file, word2vec_bin_gz, batch_size):
-    assert os.path.exists(train_file), "Training File Missing!!"
-    assert os.path.exists(word2vec_bin_gz), "Word2vec bin.gz missing"
-    assert batch_size > 0, "Batch Size < 0"
-  #end_sanity checks
 
   def get_mention_files(self, mentions_dir):
     mention_files = []
@@ -158,30 +160,16 @@ class TrainingDataReader(object):
       print("File Number loaded : {}".format(self.tr_fnum))
       print("Loaded tr mentions. Num of mentions : {}. Time : {:.2f} mins".format(
         self.num_tr_mens, ttime))
-
-    if data_idx==1 or data_idx=="val":
-      stime = time.time()
-      if self.num_val_mens_files == 1 and self.val_fnum == self.num_val_mens_files:
-        self.val_epochs += 1
-      else:
-        (self.val_mens, self.val_mens_files,
-         self.val_fnum, self.val_epochs) = self._load_mentions_from_file(
-          self.val_mens_dir, self.val_mens_files, self.num_val_mens_files,
-          self.val_fnum, self.val_epochs)
-
-      self.num_val_mens = len(self.val_mens)
-      self.val_men_idx = 0
-      ttime = (time.time() - stime)/60.0
-      #print("Loaded val mentions. Num of mentions : {}. Time : {:.2f} mins".format(
-      #  self.num_val_mens, ttime))
-      #print("File Number loaded : {}".format(self.val_fnum))
+    else:
+      print("Wrong Datatype. Exiting.")
+      sys.exit(0)
   #enddef
 
   def reset_validation(self):
     self.val_men_idx = 0
+    self.cold_val_men_idx = 0
     self.val_epochs = 0
-    self.val_fnum = 0
-    self.num_val_mens = 0
+    self.cold_val_epochs = 0
 
   def _read_mention(self, data_type=0):
     # Read train mention
@@ -189,20 +177,25 @@ class TrainingDataReader(object):
       # If all mentions read or no ments in memory
       if self.tr_men_idx == self.num_tr_mens or self.num_tr_mens == 0:
         self.load_mentions_from_file(data_type)
-
       mention = self.tr_mens[self.tr_men_idx]
       self.tr_men_idx += 1
       return mention
     # Read val mention
     if data_type == 1 or data_type == "val":
-      # If all mentions read or no mentions in memory
-      if self.val_men_idx == self.num_val_mens or self.num_val_mens == 0:
-        self.load_mentions_from_file(data_type)
-
-      mention = self.val_mens[self.val_men_idx]
+      if self.val_men_idx == self.num_val_mens:
+        self.val_epochs += 1
+        self.val_men_idx = 0
+      mention = self.val_mentions[self.val_men_idx]
       self.val_men_idx += 1
       return mention
-
+    # Read cold val mention
+    if data_type == 2 or data_type == "cold_val":
+      if self.cold_val_men_idx == self.num_cold_val_mens:
+        self.cold_val_epochs += 1
+        self.cold_val_men_idx = 0
+      mention = self.cold_val_mentions[self.cold_val_men_idx]
+      self.cold_val_men_idx += 1
+      return mention
     print("Wrong data_type arg. Quitting ... ")
     sys.exit(0)
   #enddef
@@ -231,13 +224,14 @@ class TrainingDataReader(object):
         labels_batch[batch_el][labelidx] = 1.0
       #labels
 
-      # Left and Right context includes mention surface
-      #left_tokens = m.sent_tokens[0:m.end_token+1]
-      #right_tokens = m.sent_tokens[m.start_token:][::-1]
-
       # Strict left and right context
-      left_tokens = m.sent_tokens[0:m.start_token]
-      right_tokens = m.sent_tokens[m.end_token+1:][::-1]
+      if self.strict_context:
+        left_tokens = m.sent_tokens[0:m.start_token]
+        right_tokens = m.sent_tokens[m.end_token+1:][::-1]
+      # Left and Right context includes mention surface
+      else:
+        left_tokens = m.sent_tokens[0:m.end_token+1]
+        right_tokens = m.sent_tokens[m.start_token:][::-1]
 
       left_idxs = [self.convert_word2idx(word) for word in left_tokens]
       right_idxs = [self.convert_word2idx(word) for word in right_tokens]
@@ -278,31 +272,30 @@ class TrainingDataReader(object):
   def next_val_batch(self):
     return self._next_padded_batch(data_type=1)
 
-  def add_to_vocab(self, element2idx, idx2element, element):
-    if element not in element2idx:
-      idx2element.append(element)
-      element2idx[element] = len(idx2element) - 1
+  def next_cold_val_batch(self):
+    return self._next_padded_batch(data_type=2)
 
 if __name__ == '__main__':
   batch_size = 1000
   num_batch = 1000
   b = TrainingDataReader(
     train_mentions_dir="/save/ngupta19/wikipedia/wiki_mentions/train",
-    val_mentions_dir="/save/ngupta19/wikipedia/wiki_mentions/val",
+    val_mentions_file="/save/ngupta19/wikipedia/wiki_mentions/val/val.mens",
+    val_cold_mentions_file="/save/ngupta19/wikipedia/wiki_mentions/val/val.single.mens",
     word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/word_vocab.pkl",
     label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl",
     word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
     batch_size=batch_size,
-    word_threshold=5)
+    strict_context=True)
 
   stime = time.time()
 
   i = 0
   total_instances = 0
-  while b.tr_epochs < 1 and b.val_epochs < 1:
+  while b.tr_epochs < 1 and b.val_epochs < 1 and b.cold_val_epochs < 1:
   #for i in range(0, num_batch):
     (left_batch, left_lengths,
-     right_batch, right_lengths, labels_batch) = b.next_val_batch()
+     right_batch, right_lengths, labels_batch) = b.next_cold_val_batch()
     total_instances += len(left_batch)
     if i%100 == 0:
       #print(labels_batch)
