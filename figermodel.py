@@ -13,7 +13,7 @@ flags = tf.app.flags
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate of adam optimizer [0.001]")
 flags.DEFINE_float("decay_rate", 0.96, "Decay rate of learning rate [0.96]")
 flags.DEFINE_float("decay_step", 10000, "# of decay step for learning rate decaying [10000]")
-flags.DEFINE_integer("max_steps", 10000, "Maximum of iteration [450000]")
+flags.DEFINE_integer("max_steps", 60000, "Maximum of iteration [450000]")
 flags.DEFINE_integer("pretraining_steps", 60000, "Number of steps to run pretraining")
 flags.DEFINE_string("model", "figer", "The name of model [nvdm, nasm]")
 flags.DEFINE_string("dataset", "figer", "The name of dataset [ptb]")
@@ -29,7 +29,9 @@ flags.DEFINE_float("reg_constant", 0.00, "Regularization constant for NN weight 
 flags.DEFINE_float("dropout_keep_prob", 0.7, "Dropout Keep Probability")
 flags.DEFINE_boolean("decoder_bool", True, "Decoder bool")
 flags.DEFINE_string("mode", 'tr_sup', "Mode to run")
+flags.DEFINE_boolean("strict_context", True, "Strict Context exludes mention surface")
 flags.DEFINE_string("optimizer", 'optim', "Optimizer to use. adagrad, adadelta or adam")
+
 
 FLAGS = flags.FLAGS
 
@@ -87,7 +89,8 @@ def main(_):
    test_links_dir) = get_test_dataset_paths(test_dataset)
 
   train_dir = "/save/ngupta19/wikipedia/wiki_mentions/train"
-  val_dir = "/save/ngupta19/wikipedia/wiki_mentions/val"
+  val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.mens"
+  cold_val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.single.mens"
   word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/word_vocab.pkl"
   label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/label_vocab.pkl"
   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz"
@@ -97,25 +100,35 @@ def main(_):
   if FLAGS.mode == 'tr_sup' or FLAGS.mode == 'tr_unsup':
     reader = TrainingDataReader(
       train_mentions_dir=train_dir,
-      val_mentions_dir=val_dir,
+      val_mentions_file=val_file,
+      val_cold_mentions_file=cold_val_file,
       word_vocab_pkl=word_vocab_pkl,
       label_vocab_pkl=label_vocab_pkl,
       word2vec_bin_gz=word2vec_bin_gz,
       batch_size=FLAGS.batch_size,
-      word_threshold=10)
+      strict_context=FLAGS.strict_context)
     model_mode = 'train'  # Needed for batch normalization
   elif FLAGS.mode == 'test':
-    reader = TestingDataReader(
-      mentions_file=mentions_test_file,
-      docs_dir=test_docs_dir,
-      links_dir=test_links_dir,
-      wid_vocab_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/wid_vocab.pkl",
-      word2idf_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/word2idf.pkl",
-      crosswikis_norm_pkl="/save/ngupta19/crosswikis/crosswikis.normalized.pkl",
-      word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
-      wid_Wikititle_file="/save/ngupta19/freebase/types_xiao/wid.WikiTitle",
-      cwikis_candidate_thresh=FLAGS.cwiki_threshold,
-      batch_size=FLAGS.batch_size)
+    reader = TrainingDataReader(
+      train_mentions_dir=train_dir,
+      val_mentions_file=val_file,
+      val_cold_mentions_file=cold_val_file,
+      word_vocab_pkl=word_vocab_pkl,
+      label_vocab_pkl=label_vocab_pkl,
+      word2vec_bin_gz=word2vec_bin_gz,
+      batch_size=FLAGS.batch_size,
+      strict_context=FLAGS.strict_context)
+    # reader = TestingDataReader(
+    #   mentions_file=mentions_test_file,
+    #   docs_dir=test_docs_dir,
+    #   links_dir=test_links_dir,
+    #   wid_vocab_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/wid_vocab.pkl",
+    #   word2idf_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/word2idf.pkl",
+    #   crosswikis_norm_pkl="/save/ngupta19/crosswikis/crosswikis.normalized.pkl",
+    #   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
+    #   wid_Wikititle_file="/save/ngupta19/freebase/types_xiao/wid.WikiTitle",
+    #   cwikis_candidate_thresh=FLAGS.cwiki_threshold,
+    #   batch_size=FLAGS.batch_size)
     model_mode = 'test'  # Needed for batch normalization
   else:
     print("MODE in FLAGS is incorrect : {}".format(FLAGS.mode))
@@ -142,7 +155,8 @@ def main(_):
               reg_constant=FLAGS.reg_constant,
               checkpoint_dir=FLAGS.checkpoint_dir,
               optimizer=FLAGS.optimizer,
-              mode=model_mode)
+              mode=model_mode,
+              strict=FLAGS.strict_context)
 
     if FLAGS.mode=='test':
       print("Doing inference")
