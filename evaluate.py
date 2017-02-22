@@ -104,8 +104,8 @@ def stats_for_list_of_batches(true_label_batches, pred_score_batches):
   loose_micro_f = f1(loose_micro_p, loose_micro_r)
 
   print("Strict : {}".format(strict))
-  print("Loose Macro P : {}  R : {}  F : {}".format(loose_macro_p, loose_macro_r, loose_macro_f))
-  print("Loose Micro P : {}  R : {}  F : {}".format(loose_micro_p, loose_micro_r, loose_micro_f))
+  print("Loose Macro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_macro_p, loose_macro_r, loose_macro_f))
+  print("Loose Micro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_micro_p, loose_micro_r, loose_micro_f))
 
 def f1(p,r):
   return (float(2*p*r))/(p + r)

@@ -13,7 +13,7 @@ flags = tf.app.flags
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate of adam optimizer [0.001]")
 flags.DEFINE_float("decay_rate", 0.96, "Decay rate of learning rate [0.96]")
 flags.DEFINE_float("decay_step", 10000, "# of decay step for learning rate decaying [10000]")
-flags.DEFINE_integer("max_steps", 60000, "Maximum of iteration [450000]")
+flags.DEFINE_integer("max_steps", 40000, "Maximum of iteration [450000]")
 flags.DEFINE_integer("pretraining_steps", 60000, "Number of steps to run pretraining")
 flags.DEFINE_string("model", "figer", "The name of model [nvdm, nasm]")
 flags.DEFINE_string("dataset", "figer", "The name of dataset [ptb]")
@@ -118,18 +118,8 @@ def main(_):
       word2vec_bin_gz=word2vec_bin_gz,
       batch_size=FLAGS.batch_size,
       strict_context=FLAGS.strict_context)
-    # reader = TestingDataReader(
-    #   mentions_file=mentions_test_file,
-    #   docs_dir=test_docs_dir,
-    #   links_dir=test_links_dir,
-    #   wid_vocab_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/wid_vocab.pkl",
-    #   word2idf_pkl="/save/ngupta19/wikipedia/wiki_kb/vocab/word2idf.pkl",
-    #   crosswikis_norm_pkl="/save/ngupta19/crosswikis/crosswikis.normalized.pkl",
-    #   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
-    #   wid_Wikititle_file="/save/ngupta19/freebase/types_xiao/wid.WikiTitle",
-    #   cwikis_candidate_thresh=FLAGS.cwiki_threshold,
-    #   batch_size=FLAGS.batch_size)
     model_mode = 'test'  # Needed for batch normalization
+    FLAGS.dropout_keep_prob = 1.0
   else:
     print("MODE in FLAGS is incorrect : {}".format(FLAGS.mode))
     sys.exit()
