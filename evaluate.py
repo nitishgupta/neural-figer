@@ -2,7 +2,7 @@ import os
 import sys
 import numpy as np
 
-def true_and_prediction(true_label_batch, pred_score_batch):
+def types_convert_mat_to_sets(true_label_batch, pred_score_batch):
   ''' Gets true labels and pred scores in numpy matrix and converts to list
   args
     true_label_batch: Binary Numpy matrix of [num_instances, num_labels]
@@ -29,7 +29,7 @@ def true_and_prediction(true_label_batch, pred_score_batch):
   ##
   return (true_labels, pred_labels)
 
-def true_and_prediction_stats(true_labels, pred_scores):
+def types_prediction_stats(true_labels, pred_scores):
   '''
   args
     true_label_batch: Binary Numpy matrix of [num_instances, num_labels]
@@ -63,7 +63,7 @@ def true_and_prediction_stats(true_labels, pred_scores):
   return t_intersect, t_t_hat_exact, t_hat_count, t_count, loose_macro_p, loose_macro_r
 
 
-def stats_for_list_of_batches(true_label_batches, pred_score_batches):
+def types_predict_forlistofbatches(true_label_batches, pred_score_batches):
   ''' Get lists of batches for true_labels and pred_scores
   Each element in list is a numpy matrix
     true_label_batches[i] : Binary Numpy matrix of [num_instances, num_labels]
@@ -80,12 +80,13 @@ def stats_for_list_of_batches(true_label_batches, pred_score_batches):
   loose_macro_r = 0.0
   for i in range(0, num_batches):
     # Break batch into list of true labels and pred labels for each sample
-    (true_labels_bi, pred_labels_bi) = true_and_prediction(
+    (true_labels_bi, pred_labels_bi) = types_convert_mat_to_sets(
       true_label_batches[i], pred_score_batches[i])
-    # Compute stats for batch : 
+    # Compute stats for batch :
     # Counts for tag intersection, exact match, pred tags count, true tags count
     # loose macro prec and recall contribution of batch
-    (t_i, t_th_exact, t_h_c, t_c, l_m_p, l_m_r) = true_and_prediction_stats(true_labels_bi, pred_labels_bi)
+    (t_i, t_th_exact, t_h_c, t_c, l_m_p, l_m_r) = types_prediction_stats(
+      true_labels_bi, pred_labels_bi)
     num_instances += len(true_labels_bi)
     loose_macro_p += l_m_p
     loose_macro_r += l_m_r
@@ -108,6 +109,8 @@ def stats_for_list_of_batches(true_label_batches, pred_score_batches):
   print("Loose Micro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_micro_p, loose_micro_r, loose_micro_f))
 
 def f1(p,r):
+  if p == 0.0 and r == 0.0:
+    return 0.0
   return (float(2*p*r))/(p + r)
 
 def strict_pred(true_label_batch, pred_score_batch):

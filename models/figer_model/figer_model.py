@@ -314,15 +314,12 @@ class FigerModel(Model):
       #[loss, label_sigms] = fetches
       [label_sigms] = fetches
 
-      #correct_preds, precision = evaluate.strict_pred(labels_batch, label_sigms)
-      #total_correct_preds += correct_preds
       total_instances += self.reader.batch_size
       true_label_batches.append(labels_batch)
       pred_score_batches.append(label_sigms)
     #endwhile
-    #precision = float(total_correct_preds)/float(total_instances)
     print("Num of instances {}".format(total_instances))
-    evaluate.stats_for_list_of_batches(true_label_batches, pred_score_batches)
+    evaluate.types_predict_forlistofbatches(true_label_batches, pred_score_batches)
     ttime = float(time.time() - stime)/60.0
     print("T {0:.3f} mins".format(ttime))
   #end validation
@@ -365,7 +362,7 @@ class FigerModel(Model):
     #endwhile
     #precision = float(total_correct_preds)/float(total_instances)
     print("Num of instances {}".format(total_instances))
-    evaluate.stats_for_list_of_batches(true_label_batches, pred_score_batches)
+    evaluate.types_predict_forlistofbatches(true_label_batches, pred_score_batches)
     ttime = float(time.time() - stime)/60.0
     print("T {0:.3f} mins".format(ttime))
   #end validation
