@@ -23,13 +23,14 @@ class FigerModel(Model):
                word_embed_dim, context_encoded_dim,
                context_encoder_lstmsize, context_encoder_num_layers,
                learning_rate, dropout_keep_prob, reg_constant, checkpoint_dir,
-               optimizer, mode='train', strict=True):
+               optimizer, mode='train', strict=True, pretrain_word_embed=False):
     self.optimizer = optimizer
     self.mode = mode
     self.sess = sess
     self.reader = reader  # Reader class
     self.dataset = dataset
     self.strict = strict
+    self.pretrain_word_embed = pretrain_word_embed
 
     self.max_steps = max_steps  # Max num of steps of training to run
     self.pretrain_max_steps = pretrain_max_steps
@@ -43,7 +44,10 @@ class FigerModel(Model):
     self.num_words = self.reader.num_words
 
     # Size of word embeddings
-    self.word_embed_dim = word_embed_dim
+    if not pretrain_word_embed:
+      self.word_embed_dim = word_embed_dim
+    else:
+      self.word_embed_dim = 300
 
     # Context encoders
     self.context_encoded_dim = context_encoded_dim
@@ -83,14 +87,21 @@ class FigerModel(Model):
 
       # Encoder Models : Name LSTM, Text FF and Links FF networks
       with tf.variable_scope(self.encoder_model_scope) as scope:
+        if pretrain_word_embed == False:
+          self.left_context_embeddings = tf.nn.embedding_lookup(
+            self.word_embeddings, self.left_batch, name="left_embeddings")
+          self.right_context_embeddings = tf.nn.embedding_lookup(
+            self.word_embeddings, self.right_batch, name="right_embeddings")
+
+
+
         self.context_encoder_model = ContextEncoderModel(
           num_layers=self.context_encoder_num_layers,
           batch_size=self.batch_size,
-          word_embeddings=self.word_embeddings,
           lstm_size=self.context_encoder_lstmsize,
-          left_batch=self.left_batch,
+          left_embed_batch=self.left_context_embeddings,
           left_lengths=self.left_lengths,
-          right_batch=self.right_batch,
+          right_embed_batch=self.right_context_embeddings,
           right_lengths=self.right_lengths,
           context_encoded_dim=self.context_encoded_dim,
           scope_name=self.encoder_model_scope,
@@ -134,25 +145,31 @@ class FigerModel(Model):
     self.left_lengths = tf.placeholder(tf.int32,
                                        [self.batch_size],
                                        name="left_lengths")
+    self.left_context_embeddings = tf.placeholder(
+      tf.float32, [self.batch_size, None, self.word_embed_dim], name="left_embeddings")
+
     self.right_batch = tf.placeholder(tf.int32,
                                       [self.batch_size, None],
                                       name="right_batch")
     self.right_lengths = tf.placeholder(tf.int32,
                                         [self.batch_size],
                                         name="right_lengths")
+    self.right_context_embeddings = tf.placeholder(
+      tf.float32, [self.batch_size, None, self.word_embed_dim], name="right_embeddings")
 
     self.labels_batch = tf.placeholder(tf.float32,
                                        [self.batch_size, self.num_labels],
                                        name="true_labels")
     #END-Placeholders
 
-    with tf.variable_scope(self.embeddings_scope) as s:
-      with tf.device(self.device_placements['gpu']) as d:
-        self.word_embeddings = tf.get_variable(
-          name=self.word_embed_var_name,
-          shape=[self.num_words, self.word_embed_dim],
-          initializer=tf.random_normal_initializer(
-            mean=0.0, stddev=(1.0/100.0)))
+    if self.pretrain_word_embed == False:
+      with tf.variable_scope(self.embeddings_scope) as s:
+        with tf.device(self.device_placements['gpu']) as d:
+          self.word_embeddings = tf.get_variable(
+            name=self.word_embed_var_name,
+            shape=[self.num_words, self.word_embed_dim],
+            initializer=tf.random_normal_initializer(
+              mean=0.0, stddev=(1.0/100.0)))
 
   def training_setup(self):
     # Make the loss graph
@@ -179,7 +196,7 @@ class FigerModel(Model):
   def training(self):
     vars_tostore = self.training_setup()
 
-    saver = tf.train.Saver(var_list=vars_tostore, max_to_keep=5)
+    saver = tf.train.Saver(var_list=vars_tostore, max_to_keep=20)
 
     # (Try) Load all pretraining model variables
     # If pre-training graph not found - Initialize trainable + optim variables
@@ -211,11 +228,18 @@ class FigerModel(Model):
       dtime = time.time() - dstime
       data_loading += dtime
 
-      feed_dict = {self.left_batch: left_batch,
-                   self.left_lengths: left_lengths,
-                   self.right_batch: right_batch,
-                   self.right_lengths: right_lengths,
-                   self.labels_batch: labels_batch}
+      if self.pretrain_word_embed == False:
+        feed_dict = {self.left_batch: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_batch: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
+      else:
+        feed_dict = {self.left_context_embeddings: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_context_embeddings: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
 
       fetch_tensors = [self.loss_optim.labeling_loss,
                        self.labeling_model.label_probs,
@@ -241,11 +265,7 @@ class FigerModel(Model):
                                      merged_sum],
                                     feed_dict=feed_dict)
 
-      fetches_new = self.sess.run(fetch_tensors,
-                                  feed_dict=feed_dict)
-
       [old_loss, old_label_sigms, old_norms] = fetches_old
-      [new_loss, new_label_sigms, new_norms] = fetches_new
       [l_lstm_norm, r_lstm_norm,
        c_enc_norm, lab_scores_norm] = old_norms
 
@@ -253,19 +273,15 @@ class FigerModel(Model):
         # [B, L]
         old_corr_preds, old_precision = evaluate.strict_pred(
           labels_batch, old_label_sigms)
-        new_corr_preds, new_precision = evaluate.strict_pred(
-          labels_batch, new_label_sigms)
 
-        print("Iter %2d, Epoch %d, T %4.2f secs, Loss %.3f, New_Loss %.3f"
+        print("Iter %2d, Epoch %d, T %4.2f secs, Loss %.3f"
               % (iteration, self.reader.tr_epochs, time.time() - start_time,
-                 old_loss, new_loss))
+                 old_loss))
         print("L_LSTM_NORM {0:.8f} R_LSTM_NORM {1:.8f} "
               "CON_NORM {2:.8f} LABSCORE_NORM {3:.8f}".format(
               l_lstm_norm, r_lstm_norm, c_enc_norm, lab_scores_norm))
         print("[OLD] Num of strict correct predictions : {}, {}".format(
           old_corr_preds, old_precision))
-        # print("[NEW] Num of strict correct predictions : {}, {}".format(
-        #   old_corr_preds, old_precision))
         print("Time to load data : %4.2f\n" % data_loading)
         data_loading = 0
       #end-100
@@ -297,11 +313,18 @@ class FigerModel(Model):
       (left_batch, left_lengths,
        right_batch, right_lengths, labels_batch) = self.reader.next_val_batch()
 
-      feed_dict = {self.left_batch: left_batch,
-                   self.left_lengths: left_lengths,
-                   self.right_batch: right_batch,
-                   self.right_lengths: right_lengths,
-                   self.labels_batch: labels_batch}
+      if self.pretrain_word_embed == False:
+        feed_dict = {self.left_batch: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_batch: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
+      else:
+        feed_dict = {self.left_context_embeddings: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_context_embeddings: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
 
       # fetch_tensors = [self.loss_optim.labeling_loss,
       #                  self.labeling_model.label_probs]

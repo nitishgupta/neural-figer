@@ -5,6 +5,7 @@ import sys
 import math
 import pickle
 import random
+import gensim
 import unicodedata
 import collections
 import numpy as np
@@ -44,13 +45,15 @@ class TrainingDataReader(object):
   def __init__(self, train_mentions_dir, val_mentions_file,
                val_cold_mentions_file, word_vocab_pkl,
                label_vocab_pkl, word2vec_bin_gz, batch_size,
-               strict_context=True):
+               strict_context=True, pretrain_wordembed=True):
     self.start_word = start_word
     self.end_word = end_word
     self.unk_word = '<unk_word>' # In tune with word2vec
     self.unk_wid = "<unk_wid>"
     self.tr_sup = 'tr_sup'
     self.tr_unsup = 'tr_unsup'
+    self.pretrain_wordembed = pretrain_wordembed
+
 
     if (not os.path.exists(word_vocab_pkl) or
         not os.path.exists(label_vocab_pkl)):
@@ -67,10 +70,15 @@ class TrainingDataReader(object):
     self.num_labels = len(self.idx2label)
     print("[#] Label vocab loaded. Number of labels : {}".format(self.num_labels))
 
+    if self.pretrain_wordembed:
+      print("[#] Loading pretrained word2vec embeddings .. ")
+      self.word2vec = gensim.models.Word2Vec.load_word2vec_format(
+        word2vec_bin_gz, binary=True)
+      self.word2vec.init_sims(replace=True)
+
     print("[#] Training Mentions Dir : {}".format(train_mentions_dir))
     self.tr_mens_dir = train_mentions_dir
     self.tr_mens_files = self.get_mention_files(self.tr_mens_dir)
-    #self.tr_mens_files = ["train.mens.5"]
     self.num_tr_mens_files = len(self.tr_mens_files)
     print("[#] Training Mention Files : {} files".format(self.num_tr_mens_files))
 
@@ -133,6 +141,18 @@ class TrainingDataReader(object):
     for line in mention_lines:
       mentions.append(Mention(line))
     return mentions
+  #enddef
+
+  def get_vector(self, word_idx):
+    if word_idx == 0:
+      word = 'unk'
+    elif word_idx < len(self.idx2word):
+      word = self.idx2word[word_idx]
+
+    if word in self.word2vec.vocab:
+      return self.word2vec[word]
+    else:
+      return self.word2vec['unk']
   #enddef
 
   def _load_mentions_from_file(self, mens_dir, mens_files, num_mens_files, fnum, epochs):
@@ -220,8 +240,9 @@ class TrainingDataReader(object):
       end = m.end_token
 
       for label in m.types:
-        labelidx = self.label2idx[label]
-        labels_batch[batch_el][labelidx] = 1.0
+        if label in self.label2idx:
+          labelidx = self.label2idx[label]
+          labels_batch[batch_el][labelidx] = 1.0
       #labels
 
       # Strict left and right context
@@ -242,6 +263,22 @@ class TrainingDataReader(object):
     return (left_batch, right_batch, labels_batch)
   #enddef
 
+  def embed_batch(self, batch):
+    ''' Input is a padded batch of left or right contexts containing word idxs
+    Dimensions should be [B, padded_length]
+    Output:
+      Embed the word idxs using pretrain word embedding
+    '''
+    output_batch = []
+    for b in batch:
+      word_idxs = b
+      word_embeddings = []
+      for word_idx in word_idxs:
+        word_embeddings.append(self.get_vector(word_idx))
+      output_batch.append(word_embeddings)
+    return output_batch
+
+
   def pad_batch(self, batch):
     unk_word_idx = self.word2idx[self.unk_word]
     lengths = [len(i) for i in batch]
@@ -255,7 +292,9 @@ class TrainingDataReader(object):
     (left_batch, right_batch, labels_batch) = self._next_batch(data_type=data_type)
     (left_batch, left_lengths) = self.pad_batch(left_batch)
     (right_batch, right_lengths) = self.pad_batch(right_batch)
-
+    if self.pretrain_wordembed:
+      left_batch = self.embed_batch(left_batch)
+      right_batch = self.embed_batch(right_batch)
     return (left_batch, left_lengths, right_batch, right_lengths, labels_batch)
   #enddef
 
@@ -286,7 +325,8 @@ if __name__ == '__main__':
     label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/label_vocab.pkl",
     word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
     batch_size=batch_size,
-    strict_context=True)
+    strict_context=True,
+    pretrain_wordembed=True)
 
   stime = time.time()
 
@@ -299,6 +339,7 @@ if __name__ == '__main__':
     total_instances += len(left_batch)
     if i%100 == 0:
       #print(labels_batch)
+      print(left_batch[0][0])
       etime = time.time()
       t=etime-stime
       print("{} done. Time taken : {} seconds".format(i, t))

@@ -13,8 +13,8 @@ flags = tf.app.flags
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate of adam optimizer [0.001]")
 flags.DEFINE_float("decay_rate", 0.96, "Decay rate of learning rate [0.96]")
 flags.DEFINE_float("decay_step", 10000, "# of decay step for learning rate decaying [10000]")
-flags.DEFINE_integer("max_steps", 40000, "Maximum of iteration [450000]")
-flags.DEFINE_integer("pretraining_steps", 60000, "Number of steps to run pretraining")
+flags.DEFINE_integer("max_steps", 20000, "Maximum of iteration [450000]")
+flags.DEFINE_integer("pretraining_steps", 20000, "Number of steps to run pretraining")
 flags.DEFINE_string("model", "figer", "The name of model [nvdm, nasm]")
 flags.DEFINE_string("dataset", "figer", "The name of dataset [ptb]")
 flags.DEFINE_string("checkpoint_dir", "/save/ngupta19/checkpoint", "Directory name to save the checkpoints [checkpoints]")
@@ -26,10 +26,11 @@ flags.DEFINE_integer("context_encoded_dim", 300, "Context Encoded Dim")
 flags.DEFINE_integer("context_encoder_num_layers", 1, "Num of Layers in context encoder network")
 flags.DEFINE_integer("context_encoder_lstmsize", 300, "Size of context encoder hidden layer")
 flags.DEFINE_float("reg_constant", 0.00, "Regularization constant for NN weight regularization")
-flags.DEFINE_float("dropout_keep_prob", 0.7, "Dropout Keep Probability")
+flags.DEFINE_float("dropout_keep_prob", 0.6, "Dropout Keep Probability")
 flags.DEFINE_boolean("decoder_bool", True, "Decoder bool")
 flags.DEFINE_string("mode", 'tr_sup', "Mode to run")
 flags.DEFINE_boolean("strict_context", True, "Strict Context exludes mention surface")
+flags.DEFINE_boolean("pretrain_wordembed", True, "Use Word2Vec Embeddings")
 flags.DEFINE_string("optimizer", 'optim', "Optimizer to use. adagrad, adadelta or adam")
 
 
@@ -91,6 +92,7 @@ def main(_):
   train_dir = "/save/ngupta19/wikipedia/wiki_mentions/train"
   val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.mens"
   cold_val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.single.mens"
+  test_file = "/save/ngupta19/datasets/ACE/mentions_inkb.txt"
   word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/word_vocab.pkl"
   label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/label_vocab.pkl"
   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz"
@@ -100,24 +102,26 @@ def main(_):
   if FLAGS.mode == 'tr_sup' or FLAGS.mode == 'tr_unsup':
     reader = TrainingDataReader(
       train_mentions_dir=train_dir,
-      val_mentions_file=val_file,
+      val_mentions_file=test_file,
       val_cold_mentions_file=cold_val_file,
       word_vocab_pkl=word_vocab_pkl,
       label_vocab_pkl=label_vocab_pkl,
       word2vec_bin_gz=word2vec_bin_gz,
       batch_size=FLAGS.batch_size,
-      strict_context=FLAGS.strict_context)
+      strict_context=FLAGS.strict_context,
+      pretrain_wordembed=FLAGS.pretrain_wordembed)
     model_mode = 'train'  # Needed for batch normalization
   elif FLAGS.mode == 'test':
     reader = TrainingDataReader(
       train_mentions_dir=train_dir,
-      val_mentions_file=val_file,
+      val_mentions_file=test_file,
       val_cold_mentions_file=cold_val_file,
       word_vocab_pkl=word_vocab_pkl,
       label_vocab_pkl=label_vocab_pkl,
       word2vec_bin_gz=word2vec_bin_gz,
       batch_size=FLAGS.batch_size,
-      strict_context=FLAGS.strict_context)
+      strict_context=FLAGS.strict_context,
+      pretrain_wordembed=FLAGS.pretrain_wordembed)
     model_mode = 'test'  # Needed for batch normalization
     FLAGS.dropout_keep_prob = 1.0
   else:
@@ -146,7 +150,8 @@ def main(_):
               checkpoint_dir=FLAGS.checkpoint_dir,
               optimizer=FLAGS.optimizer,
               mode=model_mode,
-              strict=FLAGS.strict_context)
+              strict=FLAGS.strict_context,
+              pretrain_word_embed=FLAGS.pretrain_wordembed)
 
     if FLAGS.mode=='test':
       print("Doing inference")

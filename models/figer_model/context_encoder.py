@@ -8,8 +8,8 @@ class ContextEncoderModel(Model):
   """Run Forward and Backward LSTM and concatenate last outputs to get
      context representation"""
 
-  def __init__(self, num_layers, batch_size, word_embeddings, lstm_size,
-               left_batch, left_lengths, right_batch, right_lengths,
+  def __init__(self, num_layers, batch_size, lstm_size,
+               left_embed_batch, left_lengths, right_embed_batch, right_lengths,
                context_encoded_dim, scope_name, device, dropout_keep_prob=1.0):
 
     self.num_layers = num_layers  # Num of layers in the encoder and decoder network
@@ -20,6 +20,8 @@ class ContextEncoderModel(Model):
     self.dropout_keep_prob = dropout_keep_prob
     self.batch_size = batch_size
     self.context_encoded_dim = context_encoded_dim
+    self.left_context_embeddings = left_embed_batch
+    self.right_context_embeddings = right_embed_batch
 
     with tf.variable_scope(scope_name) as scope, tf.device(device) as device:
       #self.left_encoder = self.lstm_network(name="left_encoder")
@@ -36,10 +38,6 @@ class ContextEncoderModel(Model):
         self.left_encoder = tf.nn.rnn_cell.MultiRNNCell(
           [l_dropout_cell] * self.num_layers, state_is_tuple=True)
 
-        #[batch_size, decoder_max_length, embed_dim]
-        self.left_context_embeddings = tf.nn.embedding_lookup(
-          word_embeddings, left_batch, name="left_embeddings")
-
         self.left_outputs, self.left_states = tf.nn.dynamic_rnn(
           cell=self.left_encoder, inputs=self.left_context_embeddings,
           sequence_length=left_lengths, dtype=tf.float32)
@@ -54,9 +52,6 @@ class ContextEncoderModel(Model):
 
         self.right_encoder = tf.nn.rnn_cell.MultiRNNCell(
           [r_dropout_cell] * self.num_layers, state_is_tuple=True)
-
-        self.right_context_embeddings = tf.nn.embedding_lookup(
-          word_embeddings, right_batch, name="right_embeddings")
 
         self.right_outputs, self.right_states = tf.nn.dynamic_rnn(
           cell=self.right_encoder, inputs=self.right_context_embeddings,
