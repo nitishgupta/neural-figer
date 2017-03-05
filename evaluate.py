@@ -123,7 +123,7 @@ def strict_pred(true_label_batch, pred_score_batch):
     correct_preds: Number of correct strict preds
     precision : correct_preds / num_instances
   '''
-  (true_labels, pred_labels) = true_and_prediction(
+  (true_labels, pred_labels) = types_convert_mat_to_sets(
     true_label_batch, pred_score_batch)
 
   num_instanes = len(true_labels)
