@@ -30,7 +30,7 @@ flags.DEFINE_float("dropout_keep_prob", 0.6, "Dropout Keep Probability")
 flags.DEFINE_boolean("decoder_bool", True, "Decoder bool")
 flags.DEFINE_string("mode", 'tr_sup', "Mode to run")
 flags.DEFINE_boolean("strict_context", True, "Strict Context exludes mention surface")
-flags.DEFINE_boolean("pretrain_wordembed", True, "Use Word2Vec Embeddings")
+flags.DEFINE_boolean("pretrain_wordembed", False, "Use Word2Vec Embeddings")
 flags.DEFINE_string("optimizer", 'optim', "Optimizer to use. adagrad, adadelta or adam")
 
 

@@ -6,6 +6,7 @@ import math
 import pickle
 import random
 import gensim
+import pprint
 import unicodedata
 import collections
 import numpy as np
@@ -21,6 +22,8 @@ def load(fname):
 
 start_word = "<s>"
 end_word = "<eos>"
+
+pp = pprint.PrettyPrinter()
 
 class Mention(object):
   def __init__(self, mention_line):
@@ -326,7 +329,7 @@ if __name__ == '__main__':
     word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz",
     batch_size=batch_size,
     strict_context=True,
-    pretrain_wordembed=True)
+    pretrain_wordembed=False)
 
   stime = time.time()
 
@@ -339,7 +342,6 @@ if __name__ == '__main__':
     total_instances += len(left_batch)
     if i%100 == 0:
       #print(labels_batch)
-      print(left_batch[0][0])
       etime = time.time()
       t=etime-stime
       print("{} done. Time taken : {} seconds".format(i, t))
@@ -349,3 +351,4 @@ if __name__ == '__main__':
   t=etime-stime
   print("Total Instances : {}".format(total_instances))
   print("Total time (in secs) to make %d batches of size %d : %7.4f seconds" % (i, batch_size, t))
+  pp.pprint(b.label2idx)

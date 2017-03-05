@@ -342,7 +342,7 @@ class FigerModel(Model):
       pred_score_batches.append(label_sigms)
     #endwhile
     print("Num of instances {}".format(total_instances))
-    evaluate.types_predict_forlistofbatches(true_label_batches, pred_score_batches)
+    evaluate.types_predictions(true_label_batches, pred_score_batches)
     ttime = float(time.time() - stime)/60.0
     print("T {0:.3f} mins".format(ttime))
   #end validation
@@ -360,11 +360,18 @@ class FigerModel(Model):
       (left_batch, left_lengths,
        right_batch, right_lengths, labels_batch) = self.reader.next_cold_val_batch()
 
-      feed_dict = {self.left_batch: left_batch,
-                   self.left_lengths: left_lengths,
-                   self.right_batch: right_batch,
-                   self.right_lengths: right_lengths,
-                   self.labels_batch: labels_batch}
+      if self.pretrain_word_embed == False:
+        feed_dict = {self.left_batch: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_batch: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
+      else:
+        feed_dict = {self.left_context_embeddings: left_batch,
+                     self.left_lengths: left_lengths,
+                     self.right_context_embeddings: right_batch,
+                     self.right_lengths: right_lengths,
+                     self.labels_batch: labels_batch}
 
       # fetch_tensors = [self.loss_optim.labeling_loss,
       #                  self.labeling_model.label_probs]
@@ -385,7 +392,7 @@ class FigerModel(Model):
     #endwhile
     #precision = float(total_correct_preds)/float(total_instances)
     print("Num of instances {}".format(total_instances))
-    evaluate.types_predict_forlistofbatches(true_label_batches, pred_score_batches)
+    evaluate.types_predictions(true_label_batches, pred_score_batches)
     ttime = float(time.time() - stime)/60.0
     print("T {0:.3f} mins".format(ttime))
   #end validation
