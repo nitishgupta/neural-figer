@@ -13,8 +13,8 @@ flags = tf.app.flags
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate of adam optimizer [0.001]")
 flags.DEFINE_float("decay_rate", 0.96, "Decay rate of learning rate [0.96]")
 flags.DEFINE_float("decay_step", 10000, "# of decay step for learning rate decaying [10000]")
-flags.DEFINE_integer("max_steps", 20000, "Maximum of iteration [450000]")
-flags.DEFINE_integer("pretraining_steps", 20000, "Number of steps to run pretraining")
+flags.DEFINE_integer("max_steps", 40000, "Maximum of iteration [450000]")
+flags.DEFINE_integer("pretraining_steps", 25000, "Number of steps to run pretraining")
 flags.DEFINE_string("model", "figer", "The name of model [nvdm, nasm]")
 flags.DEFINE_string("dataset", "figer", "The name of dataset [ptb]")
 flags.DEFINE_string("checkpoint_dir", "/save/ngupta19/checkpoint", "Directory name to save the checkpoints [checkpoints]")
@@ -92,7 +92,10 @@ def main(_):
   train_dir = "/save/ngupta19/wikipedia/wiki_mentions/train"
   val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.mens"
   cold_val_file = "/save/ngupta19/wikipedia/wiki_mentions/val/val.single.mens"
-  test_file = "/save/ngupta19/datasets/ACE/mentions_inkb.txt"
+  ace_test_file = "/save/ngupta19/datasets/ACE/mentions_inkb.txt"
+  aida_train_file="/save/ngupta19/datasets/AIDA/inkb_mentions/mentions_train_inkb.txt"
+  aida_dev_file="/save/ngupta19/datasets/AIDA/inkb_mentions/mentions_dev_inkb.txt"
+  aida_test_file="/save/ngupta19/datasets/AIDA/inkb_mentions/mentions_test_inkb.txt"
   word_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/word_vocab.pkl"
   label_vocab_pkl="/save/ngupta19/wikipedia/wiki_mentions/vocab/figer/label_vocab.pkl"
   word2vec_bin_gz="/save/ngupta19/word2vec/GoogleNews-vectors-negative300.bin.gz"
@@ -102,7 +105,7 @@ def main(_):
   if FLAGS.mode == 'tr_sup' or FLAGS.mode == 'tr_unsup':
     reader = TrainingDataReader(
       train_mentions_dir=train_dir,
-      val_mentions_file=test_file,
+      val_mentions_file=val_file,
       val_cold_mentions_file=cold_val_file,
       word_vocab_pkl=word_vocab_pkl,
       label_vocab_pkl=label_vocab_pkl,
@@ -114,8 +117,8 @@ def main(_):
   elif FLAGS.mode == 'test':
     reader = TrainingDataReader(
       train_mentions_dir=train_dir,
-      val_mentions_file=test_file,
-      val_cold_mentions_file=cold_val_file,
+      val_mentions_file=ace_test_file,
+      val_cold_mentions_file=aida_train_file,
       word_vocab_pkl=word_vocab_pkl,
       label_vocab_pkl=label_vocab_pkl,
       word2vec_bin_gz=word2vec_bin_gz,
