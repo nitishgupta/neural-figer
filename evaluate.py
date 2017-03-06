@@ -4,7 +4,7 @@ import numpy as np
 
 
 ''' Location : 1, Organization : 5, Person : 9, Event : 29] '''
-coarseTypeIds = [1, 5, 9, 29]
+coarseTypeIds = set([1, 5, 9, 29])
 
 def types_convert_mat_to_sets(true_label_batch, pred_score_batch):
   ''' Gets true labels and pred scores in numpy matrix and converts to list
@@ -53,19 +53,35 @@ def types_prediction_stats(true_labels, pred_labels):
   num_instances = len(true_labels)
   for i in range(0, num_instances):
     intersect = len(true_labels[i].intersection(pred_labels[i]))
-    t_h_c = len(pred_labels[i])
-    t_c = len(true_labels[i])
     t_intersect += intersect
-    t_hat_count += t_h_c
-    t_count += t_c
+    t_hat_count += len(pred_labels[i])
+    t_count += len(true_labels[i])
     exact = 1 if (true_labels[i] == pred_labels[i]) else 0
     t_t_hat_exact += exact
     if len(pred_labels[i]) > 0:
-      loose_macro_p += intersect / float(t_h_c)
+      loose_macro_p += intersect / float(len(pred_labels[i]))
     if len(true_labels[i]) > 0:
-      loose_macro_r += intersect / float(t_c)
+      loose_macro_r += intersect / float(len(true_labels[i]))
 
   return t_intersect, t_t_hat_exact, t_hat_count, t_count, loose_macro_p, loose_macro_r
+
+def prune_truepred_labels_for_coarse(true_labels, pred_labels):
+  coarse_true_labels = []
+  coarse_pred_labels = []
+  for i in range(0, len(true_labels)):
+    tr_label_set = true_labels[i]
+    pr_label_set = pred_labels[i]
+    tr_coarse_types = tr_label_set.intersection(coarseTypeIds)
+    pr_coarse_types = pr_label_set.intersection(coarseTypeIds)
+    if len(tr_coarse_types) > 0 or len(pr_coarse_types) > 0:
+      coarse_true_labels.append(tr_coarse_types)
+      coarse_pred_labels.append(pr_coarse_types)
+
+  assert len(coarse_true_labels) == len(coarse_pred_labels)
+  print("Num of ins : {}. Num of coarse instances : {}".format(
+        len(true_labels), len(coarse_true_labels)))
+
+  return (coarse_true_labels, coarse_pred_labels)
 
 
 def types_predictions(true_label_batches, pred_score_batches):
@@ -84,10 +100,36 @@ def types_predictions(true_label_batches, pred_score_batches):
       true_label_batches[i], pred_score_batches[i])
     true_labels.extend(true_labels_bi)
     pred_labels.extend(pred_labels_bi)
-    num_instances += len(true_labels_bi)
-  #
+
+  num_instances = len(true_labels)
   (t_i, t_th_exact, t_h_c, t_c, l_m_p, l_m_r) = types_prediction_stats(
     true_labels, pred_labels)
+
+  strict = float(t_th_exact)/float(num_instances)
+  loose_macro_p = l_m_p / float(num_instances)
+  loose_macro_r = l_m_r / float(num_instances)
+  loose_macro_f = f1(loose_macro_p, loose_macro_r)
+  if t_h_c > 0:
+    loose_micro_p = float(t_i)/float(t_h_c)
+  else:
+    loose_micro_p = 0
+  if t_c > 0:
+    loose_micro_r = float(t_i)/float(t_c)
+  else:
+    loose_micro_r = 0
+  loose_micro_f = f1(loose_micro_p, loose_micro_r)
+
+  print("Strict : {}".format(strict))
+  print("Loose Macro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_macro_p, loose_macro_r, loose_macro_f))
+  print("Loose Micro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_micro_p, loose_micro_r, loose_micro_f))
+
+  # COARSE TYPE PREDICTION STATS
+
+  (coarse_true_labels, coarse_pred_labels) = prune_truepred_labels_for_coarse(
+    true_labels, pred_labels)
+  num_instances = len(coarse_true_labels)
+  (t_i, t_th_exact, t_h_c, t_c, l_m_p, l_m_r) = types_prediction_stats(
+    coarse_true_labels, coarse_pred_labels)
 
   strict = float(t_th_exact)/float(num_instances)
   loose_macro_p = l_m_p / float(num_instances)
@@ -97,11 +139,9 @@ def types_predictions(true_label_batches, pred_score_batches):
   loose_micro_r = float(t_i)/float(t_c)
   loose_micro_f = f1(loose_micro_p, loose_micro_r)
 
-  print("Strict : {}".format(strict))
-  print("Loose Macro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_macro_p, loose_macro_r, loose_macro_f))
-  print("Loose Micro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_micro_p, loose_micro_r, loose_micro_f))
-
-
+  print("Coarse Strict : {}".format(strict))
+  print("Coarse Loose Macro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_macro_p, loose_macro_r, loose_macro_f))
+  print("Coarse Loose Micro P : {0:.3f}  R : {1:.3f}  F : {2:.3f}".format(loose_micro_p, loose_micro_r, loose_micro_f))
 
 def f1(p,r):
   if p == 0.0 and r == 0.0:
