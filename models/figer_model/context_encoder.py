@@ -80,9 +80,25 @@ class ContextEncoderModel(Model):
           stddev=1.0/(100.0)))
 
       # [B, context_encoded_dim]
-      self.context_encoded = tf.matmul(self.context_lstm_encoded, self.trans_weights)
-      #self.context_encoded = tf.tanh(self.context_encoded)
+      context_encoded = tf.matmul(self.context_lstm_encoded, self.trans_weights)
+
+      '''
+      self.trans_weights2 = tf.get_variable(
+        name="context_trans_weights2",
+        shape=[self.context_encoded_dim, self.context_encoded_dim],
+        initializer=tf.random_normal_initializer(
+          mean=0.0,
+          stddev=1.0/(100.0)))
+      # TRYING TO USE ANOTHER HIDDEN LAYER WHEN TRANFORMING LSTM OUTPUT
+      # Remove this part to remove the hidden layer
+      self.context_encoded = tf.tanh(self.context_encoded)
       self.context_encoded = tf.nn.dropout(self.context_encoded, keep_prob=self.dropout_keep_prob)
+      self.context_encoded = tf.matmul(self.context_encoded, self.trans_weights2)
+      '''
+
+
+
+      self.context_encoded = tf.nn.dropout(context_encoded, keep_prob=self.dropout_keep_prob)
   ###########   end def __init__      ##########################################
 
   def lstm_network(self, name):
